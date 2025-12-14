@@ -1,0 +1,9 @@
+.git
+.gitignore
+README.md
+Makefile
+*.md
+cloud-pricing-monitor
+*.exe
+*.test
+.env
