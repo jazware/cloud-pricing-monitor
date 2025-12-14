@@ -42,16 +42,10 @@ func (f *GCPPricingFetcher) FetchPricing(ctx context.Context, region, machineTyp
 	// Get the service for Compute Engine
 	serviceId := "services/6F81-5844-456A" // Compute Engine service ID
 
-	// Build a filter to find pricing for this machine type
-	// GCP pricing is based on vCPU and memory separately
-	vcpuPrice, err := f.getVCPUPrice(ctx, serviceId, region, family)
+	// Fetch both vCPU and memory pricing in a single API call
+	vcpuPrice, memoryPrice, err := f.getPricing(ctx, serviceId, region, family)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get vCPU pricing: %w", err)
-	}
-
-	memoryPrice, err := f.getMemoryPrice(ctx, serviceId, region, family)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get memory pricing: %w", err)
+		return nil, fmt.Errorf("failed to get pricing: %w", err)
 	}
 
 	totalCost := (vcpuPrice * float64(vcpus)) + (memoryPrice * memoryGB)
@@ -76,68 +70,56 @@ func (f *GCPPricingFetcher) FetchPricing(ctx context.Context, region, machineTyp
 	}, nil
 }
 
-func (f *GCPPricingFetcher) getVCPUPrice(ctx context.Context, serviceId, region, family string) (float64, error) {
-	// Search for vCPU pricing SKUs
+// getPricing fetches both vCPU and memory pricing in a single API call
+func (f *GCPPricingFetcher) getPricing(ctx context.Context, serviceId, region, family string) (vcpuPrice, memoryPrice float64, err error) {
 	call := f.service.Services.Skus.List(serviceId)
 	call.CurrencyCode("USD")
 
-	var price float64
-	err := call.Pages(ctx, func(page *cloudbilling.ListSkusResponse) error {
+	var foundVCPU, foundMemory bool
+
+	err = call.Pages(ctx, func(page *cloudbilling.ListSkusResponse) error {
 		for _, sku := range page.Skus {
-			// Look for vCPU pricing for the specified region and family
-			if f.matchesVCPUSku(sku, region, family) {
+			// Check for vCPU pricing
+			if !foundVCPU && f.matchesVCPUSku(sku, region, family) {
 				if len(sku.PricingInfo) > 0 && len(sku.PricingInfo[0].PricingExpression.TieredRates) > 0 {
-					// Get the price from the first tier (usually the only tier for simple pricing)
 					nanos := sku.PricingInfo[0].PricingExpression.TieredRates[0].UnitPrice.Nanos
 					units := sku.PricingInfo[0].PricingExpression.TieredRates[0].UnitPrice.Units
-					price = float64(units) + (float64(nanos) / 1e9)
-					return nil
+					vcpuPrice = float64(units) + (float64(nanos) / 1e9)
+					foundVCPU = true
 				}
+			}
+
+			// Check for memory pricing
+			if !foundMemory && f.matchesMemorySku(sku, region, family) {
+				if len(sku.PricingInfo) > 0 && len(sku.PricingInfo[0].PricingExpression.TieredRates) > 0 {
+					nanos := sku.PricingInfo[0].PricingExpression.TieredRates[0].UnitPrice.Nanos
+					units := sku.PricingInfo[0].PricingExpression.TieredRates[0].UnitPrice.Units
+					memoryPrice = float64(units) + (float64(nanos) / 1e9)
+					foundMemory = true
+				}
+			}
+
+			// Early exit if we found both prices
+			if foundVCPU && foundMemory {
+				return nil
 			}
 		}
 		return nil
 	})
 
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
-	if price == 0 {
-		return 0, fmt.Errorf("no vCPU pricing found for region %s and family %s", region, family)
+	if !foundVCPU {
+		return 0, 0, fmt.Errorf("no vCPU pricing found for region %s and family %s", region, family)
 	}
 
-	return price, nil
-}
-
-func (f *GCPPricingFetcher) getMemoryPrice(ctx context.Context, serviceId, region, family string) (float64, error) {
-	call := f.service.Services.Skus.List(serviceId)
-	call.CurrencyCode("USD")
-
-	var price float64
-	err := call.Pages(ctx, func(page *cloudbilling.ListSkusResponse) error {
-		for _, sku := range page.Skus {
-			// Look for memory pricing for the specified region and family
-			if f.matchesMemorySku(sku, region, family) {
-				if len(sku.PricingInfo) > 0 && len(sku.PricingInfo[0].PricingExpression.TieredRates) > 0 {
-					nanos := sku.PricingInfo[0].PricingExpression.TieredRates[0].UnitPrice.Nanos
-					units := sku.PricingInfo[0].PricingExpression.TieredRates[0].UnitPrice.Units
-					price = float64(units) + (float64(nanos) / 1e9)
-					return nil
-				}
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		return 0, err
+	if !foundMemory {
+		return 0, 0, fmt.Errorf("no memory pricing found for region %s and family %s", region, family)
 	}
 
-	if price == 0 {
-		return 0, fmt.Errorf("no memory pricing found for region %s and family %s", region, family)
-	}
-
-	return price, nil
+	return vcpuPrice, memoryPrice, nil
 }
 
 func (f *GCPPricingFetcher) matchesVCPUSku(sku *cloudbilling.Sku, region, family string) bool {
@@ -203,13 +185,7 @@ func (f *GCPPricingFetcher) matchesMemorySku(sku *cloudbilling.Sku, region, fami
 	}
 
 	// Check region match
-	for _, serviceRegion := range sku.ServiceRegions {
-		if serviceRegion == region {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(sku.ServiceRegions, region)
 }
 
 // parseMachineType extracts the machine family, vCPU count, and memory from GCP machine type

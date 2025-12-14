@@ -2,7 +2,7 @@ services:
   cloud-pricing-monitor:
     build: .
     ports:
-      - "6009:6009"
+      - "6015:6015"
     env_file: ".env"
     volumes:
       # Uncomment and adjust path to your GCP service account key
