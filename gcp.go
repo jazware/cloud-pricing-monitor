@@ -125,6 +125,19 @@ func (f *GCPPricingFetcher) getPricing(ctx context.Context, serviceId, region, f
 func (f *GCPPricingFetcher) matchesVCPUSku(sku *cloudbilling.Sku, region, family string) bool {
 	desc := strings.ToLower(sku.Description)
 
+	// Exclude preemptible, spot, and commitment-based pricing
+	if strings.Contains(desc, "preemptible") ||
+		strings.Contains(desc, "spot") ||
+		strings.Contains(desc, "commitment") ||
+		strings.Contains(desc, "commit") {
+		return false
+	}
+
+	// Exclude continued use discounts
+	if strings.Contains(desc, "discount") || strings.Contains(desc, "cud") {
+		return false
+	}
+
 	// Check if it's a vCPU SKU
 	if !strings.Contains(desc, "core") && !strings.Contains(desc, "vcpu") {
 		return false
@@ -141,7 +154,7 @@ func (f *GCPPricingFetcher) matchesVCPUSku(sku *cloudbilling.Sku, region, family
 		familyMatch = strings.Contains(desc, "n2 instance") || strings.Contains(desc, "n2d instance")
 	case "n4", "n4d":
 		familyMatch = strings.Contains(desc, "n4 instance") || strings.Contains(desc, "n4d instance")
-	case "c2", "c2d", "c3":
+	case "c2", "c2d", "c3", "c4":
 		familyMatch = strings.Contains(desc, family+" instance")
 	default:
 		familyMatch = strings.Contains(desc, family)
@@ -157,6 +170,19 @@ func (f *GCPPricingFetcher) matchesVCPUSku(sku *cloudbilling.Sku, region, family
 
 func (f *GCPPricingFetcher) matchesMemorySku(sku *cloudbilling.Sku, region, family string) bool {
 	desc := strings.ToLower(sku.Description)
+
+	// Exclude preemptible, spot, and commitment-based pricing
+	if strings.Contains(desc, "preemptible") ||
+		strings.Contains(desc, "spot") ||
+		strings.Contains(desc, "commitment") ||
+		strings.Contains(desc, "commit") {
+		return false
+	}
+
+	// Exclude continued use discounts
+	if strings.Contains(desc, "discount") || strings.Contains(desc, "cud") {
+		return false
+	}
 
 	// Check if it's a memory SKU
 	if !strings.Contains(desc, "ram") && !strings.Contains(desc, "memory") {
@@ -174,7 +200,7 @@ func (f *GCPPricingFetcher) matchesMemorySku(sku *cloudbilling.Sku, region, fami
 		familyMatch = strings.Contains(desc, "n2 instance") || strings.Contains(desc, "n2d instance")
 	case "n4", "n4d":
 		familyMatch = strings.Contains(desc, "n4 instance") || strings.Contains(desc, "n4d instance")
-	case "c2", "c2d", "c3":
+	case "c2", "c2d", "c3", "c4":
 		familyMatch = strings.Contains(desc, family+" instance")
 	default:
 		familyMatch = strings.Contains(desc, family)
