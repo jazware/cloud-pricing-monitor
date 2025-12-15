@@ -24,7 +24,7 @@ WORKDIR /root/
 COPY --from=builder /app/cloud-pricing-monitor .
 
 # Expose metrics port
-EXPOSE 9090
+EXPOSE 6015
 
 # Run the application
 ENTRYPOINT ["./cloud-pricing-monitor"]

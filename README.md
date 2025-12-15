@@ -1,6 +1,6 @@
 # Cloud Pricing Monitor
 
-A Go-based tool to monitor AWS EC2 and GCP Compute Engine VM pricing and export metrics in Prometheus format.
+A tool to monitor AWS EC2 and GCP Compute Engine VM pricing and export metrics in Prometheus format.
 
 ## Features
 
@@ -11,76 +11,56 @@ A Go-based tool to monitor AWS EC2 and GCP Compute Engine VM pricing and export 
   - Cost per vCPU per hour
 - Configurable polling interval (default: 1 hour)
 - Support for multiple regions and instance types
-- Built-in telemetry and structured logging
 
-## Installation
+## Quick Start with Docker Compose (Recommended)
 
-```bash
-go install github.com/jazware/cloud-pricing-monitor@latest
-```
+The easiest way to run Cloud Pricing Monitor is using Docker Compose:
 
-Or build from source:
+1. Copy the example environment file and configure it:
+   ```bash
+   cp .env.example .env
+   ```
 
-```bash
-git clone https://github.com/jazware/cloud-pricing-monitor
-cd cloud-pricing-monitor
-go build -o cloud-pricing-monitor
-```
+2. Edit [.env](.env) with your cloud provider settings:
+   ```bash
+   # AWS Configuration
+   AWS_REGIONS=us-east-1,us-west-2
+   AWS_INSTANCE_TYPES=t3.micro,t3.small,m5.large
+   AWS_ACCESS_KEY_ID=your_access_key
+   AWS_SECRET_ACCESS_KEY=your_secret_key
 
-## Usage
+   # GCP Configuration
+   GCP_REGIONS=us-central1,europe-west1
+   GCP_INSTANCE_TYPES=e2-micro,n2-standard-2
+   # Note this path is mounted into the container in the docker-compose from `./secrets/gcp-creds.json`
+   GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-creds.json
 
-### Basic Example
+   # App Configuration
+   POLL_INTERVAL=1h
+   METRICS_LISTEN_ADDRESS=:6015
+   LOG_LEVEL=info
+   ```
 
-Monitor AWS EC2 pricing in us-east-1:
+3. If using GCP, place your service account key file:
+   ```bash
+   mkdir -p secrets
+   cp /path/to/your/gcp-key.json secrets/gcp-creds.json
+   ```
 
-```bash
-cloud-pricing-monitor \
-  --aws-regions us-east-1 \
-  --aws-instance-types t3.micro,t3.small,m5.large
-```
+4. Start the service:
+   ```bash
+   docker compose up -d
+   ```
 
-Monitor GCP pricing in us-central1:
+5. View metrics:
+   ```bash
+   curl http://localhost:6015/metrics
+   ```
 
-```bash
-cloud-pricing-monitor \
-  --gcp-regions us-central1 \
-  --gcp-instance-types e2-micro,n2-standard-2
-```
-
-Monitor both AWS and GCP:
-
-```bash
-cloud-pricing-monitor \
-  --aws-regions us-east-1,us-west-2 \
-  --aws-instance-types t3.micro,m5.large \
-  --gcp-regions us-central1,europe-west1 \
-  --gcp-instance-types e2-micro,n2-standard-2 \
-  --poll-interval 30m \
-  --metrics-addr :9090
-```
-
-### Configuration Options
-
-| Flag | Environment Variable | Default | Description |
-|------|---------------------|---------|-------------|
-| `--aws-regions` | `AWS_REGIONS` | - | Comma-separated list of AWS regions to monitor |
-| `--aws-instance-types` | `AWS_INSTANCE_TYPES` | - | Comma-separated list of AWS EC2 instance types |
-| `--gcp-regions` | `GCP_REGIONS` | - | Comma-separated list of GCP regions to monitor |
-| `--gcp-instance-types` | `GCP_INSTANCE_TYPES` | - | Comma-separated list of GCP machine types |
-| `--poll-interval` | `POLL_INTERVAL` | `1h` | How often to refresh pricing data |
-| `--metrics-addr` | `METRICS_ADDR` | `:9090` | Address to serve Prometheus metrics |
-| `--log-level` | `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
-
-### Using Environment Variables
-
-```bash
-export AWS_REGIONS=us-east-1,us-west-2
-export AWS_INSTANCE_TYPES=t3.micro,t3.small,m5.large
-export POLL_INTERVAL=30m
-export LOG_LEVEL=debug
-
-cloud-pricing-monitor
-```
+6. View logs:
+   ```bash
+   docker compose logs -f
+   ```
 
 ## Authentication
 
@@ -128,6 +108,59 @@ The tool uses Application Default Credentials. Configure using one of:
 
 Required GCP permissions:
 - `cloudbilling.skus.list` (typically included in the `roles/billing.viewer` role)
+
+## Usage
+
+### Basic Example
+
+Monitor AWS EC2 pricing in us-east-1:
+
+```bash
+cloud-pricing-monitor \
+  --aws-regions us-east-1 \
+  --aws-instance-types t3.micro,t3.small,m5.large
+```
+
+Monitor GCP pricing in us-central1:
+
+```bash
+cloud-pricing-monitor \
+  --gcp-regions us-central1 \
+  --gcp-instance-types e2-micro,n2-standard-2
+```
+
+Monitor both AWS and GCP:
+
+```bash
+cloud-pricing-monitor \
+  --aws-regions us-east-1,us-west-2 \
+  --aws-instance-types t3.micro,m5.large \
+  --gcp-regions us-central1,europe-west1 \
+  --gcp-instance-types e2-micro,n2-standard-2 \
+  --poll-interval 30m \
+  --metrics-listen-address :9090
+```
+
+### Configuration Options
+
+| Flag | Environment Variable | Default | Description |
+|------|---------------------|---------|-------------|
+| `--aws-regions` | `AWS_REGIONS` | - | Comma-separated list of AWS regions to monitor |
+| `--aws-instance-types` | `AWS_INSTANCE_TYPES` | - | Comma-separated list of AWS EC2 instance types |
+| `--gcp-regions` | `GCP_REGIONS` | - | Comma-separated list of GCP regions to monitor |
+| `--gcp-instance-types` | `GCP_INSTANCE_TYPES` | - | Comma-separated list of GCP machine types |
+| `--poll-interval` | `POLL_INTERVAL` | `1h` | How often to refresh pricing data |
+| `--metrics-listen-address` | `METRICS_LISTEN_ADDRESS` | `:9090` | Address to serve Prometheus metrics |
+
+### Using Environment Variables
+
+```bash
+export AWS_REGIONS=us-east-1,us-west-2
+export AWS_INSTANCE_TYPES=t3.micro,t3.small,m5.large
+export POLL_INTERVAL=30m
+
+cloud-pricing-monitor
+```
 
 ## Prometheus Metrics
 
@@ -193,18 +226,16 @@ Find the cheapest instance per vCPU:
 sort(cloud_vm_cost_per_vcpu_hour)
 ```
 
-## Docker
+### Running with Plain Docker
 
-Build the Docker image:
+If you need to use Docker without Docker Compose:
 
 ```bash
+# Build the image
 docker build -t cloud-pricing-monitor .
-```
 
-Run with Docker:
-
-```bash
-docker run -p 9090:9090 \
+# Run the container
+docker run -p 6015:6015 \
   -e AWS_REGIONS=us-east-1 \
   -e AWS_INSTANCE_TYPES=t3.micro,m5.large \
   -e AWS_ACCESS_KEY_ID=your_key \
@@ -212,22 +243,7 @@ docker run -p 9090:9090 \
   cloud-pricing-monitor
 ```
 
-## Development
-
-Run tests:
-```bash
-go test ./...
-```
-
-Build:
-```bash
-go build -o cloud-pricing-monitor
-```
-
-Run locally:
-```bash
-go run . --aws-regions us-east-1 --aws-instance-types t3.micro
-```
+**Note:** We recommend using Docker Compose (see Quick Start above) for easier configuration management.
 
 ## Notes
 
@@ -236,7 +252,3 @@ go run . --aws-regions us-east-1 --aws-instance-types t3.micro
 - Pricing data is cached and refreshed at the configured poll interval
 - For AWS, only Linux on-demand pricing with shared tenancy is tracked
 - GCP pricing is calculated based on per-vCPU and per-GB-RAM pricing
-
-## License
-
-MIT
