@@ -226,6 +226,37 @@ Find the cheapest instance per vCPU:
 sort(cloud_vm_cost_per_vcpu_hour)
 ```
 
+## Grafana Dashboard
+
+A pre-built Grafana dashboard is included to visualize cloud pricing metrics.
+
+![Cloud Pricing Dashboard](dash-screenshot.png)
+
+The dashboard includes:
+- **Average GB/mo Cost** - Cost per GB of RAM across regions
+- **Average vCPU/mo Cost** - Cost per vCPU across regions
+- **RAM Price per GB/mo** - Detailed RAM pricing by instance type and region
+- **Compute Price per vCPU/mo** - Detailed vCPU pricing by instance type and region
+- **Logs** - Application logs (requires Loki data source)
+
+### Importing the Dashboard
+
+1. Open Grafana and navigate to **Dashboards** → **Import**
+
+2. Upload the dashboard file:
+   ```bash
+   cat grafana-dashboard.json
+   ```
+   Or click **Upload JSON file** and select [grafana-dashboard.json](grafana-dashboard.json)
+
+3. Configure the data sources:
+   - **Prometheus**: Select your Prometheus data source that scrapes the Cloud Pricing Monitor metrics endpoint
+   - **Loki** (optional): Select your Loki data source if you want to view application logs
+
+4. Click **Import**
+
+The dashboard will automatically start displaying pricing data once metrics are being collected.
+
 ### Running with Plain Docker
 
 If you need to use Docker without Docker Compose:
