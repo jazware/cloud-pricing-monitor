@@ -138,7 +138,7 @@ cloud-pricing-monitor \
   --gcp-regions us-central1,europe-west1 \
   --gcp-instance-types e2-micro,n2-standard-2 \
   --poll-interval 30m \
-  --metrics-listen-address :9090
+  --metrics-listen-address :6009
 ```
 
 ### Configuration Options
@@ -150,7 +150,7 @@ cloud-pricing-monitor \
 | `--gcp-regions` | `GCP_REGIONS` | - | Comma-separated list of GCP regions to monitor |
 | `--gcp-instance-types` | `GCP_INSTANCE_TYPES` | - | Comma-separated list of GCP machine types |
 | `--poll-interval` | `POLL_INTERVAL` | `1h` | How often to refresh pricing data |
-| `--metrics-listen-address` | `METRICS_LISTEN_ADDRESS` | `:9090` | Address to serve Prometheus metrics |
+| `--metrics-listen-address` | `METRICS_LISTEN_ADDRESS` | `:6009` | Address to serve Prometheus metrics |
 
 ### Using Environment Variables
 
